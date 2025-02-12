@@ -20,13 +20,33 @@ Inspired by [DeepSeek-R1](https://github.com/deepseek-ai/DeepSeek-R1) and [open-
 
 ## News
 
+- 2025.02.12 Release X-R1-1.5B config/wandb/model/log
 - 2025.02.12: Release X-R1 first version
 
 ## Result
 
+### Overview
+
+We would share training details about  config/wandb/model/log, also evaluation results.
+
+| Model                 | 0.5B                     | 1.5B                                                         | 3B   | 7B   |
+| --------------------- | ------------------------ | ------------------------------------------------------------ | ---- | ---- |
+| TargetModel           |                          | xiaodongguaAIGC/X-R1-1.5B                                    |      |      |
+| Log                   |                          | [[link]](https://drive.google.com/file/d/11tBShY206Pu_SxWE0M-mG2_Cdf9mFNig/view?usp=sharing) |      |      |
+| Wandb                 |                          | [link]                                                       |      |      |
+| Test                  |                          | [link]                                                       |      |      |
+| GPU                   | 4x3090                   | 4x3090                                                       |      |      |
+| Base                  | Qwen/Qwen2.5-0.5B        | Qwen/Qwen2.5-0.5B                                            |      |      |
+| Data                  | xiaodongguaAIGC/X-R1-750 | xiaodongguaAIGC/X-R1-750                                     |      |      |
+| Config: recipes       |                          | X_R1_zero_1dot5B_config.yaml                                 |      |      |
+| num_generations       | 16                       | 8                                                            |      |      |
+| max_completion_length | 512                      | 1024                                                         |      |      |
+| num_train_epochs      | 3                        | 3                                                            |      |      |
+| Times                 |                          | 1:59:06                                                      |      |      |
+
 ### running
 
-0.5B, 4x3090.  if yohave 4GPUs, you should set `--num_processes=3`.  One GPU deploy vLLM as online inference engine, for faster GRPO sampling
+0.5B, 4x3090.  if you have 4 GPUs, you should set `--num_processes=3`.  One GPU deploy vLLM as online inference engine, for faster GRPO sampling
 
 example: 4x4090, 3epochs, training time, ~1h20min
 
@@ -49,6 +69,8 @@ src/x_r1/grpo.py \
 ***Wait**, that doesn't match either of our options. It seems like I made a **mistake** in my **assumptions**. **Let's go back** to the original equations*
 
 ![aha_moment](./README.assets/aha_moment_0.5B.png)
+
+
 
 ## Installation
 
