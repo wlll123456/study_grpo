@@ -62,7 +62,7 @@ conda activate xr1
 and
 
 ```
-pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install -r requirements.txt
 ```
 
 for test environment:
