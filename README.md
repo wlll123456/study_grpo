@@ -111,7 +111,9 @@ X-R1 use 4x3090 ~16h training 3B-base with 7.5k chinese math problem.
 
 ## Installation
 
-required: cuda> 12.4
+### conda & pip
+
+required: cuda >= 12.4
 
 ```bash
 conda create -n xr1 python=3.11
@@ -123,6 +125,8 @@ and
 ```bash
 pip install -r requirements.txt
 ```
+
+### quick start
 
 for test environment:
 
