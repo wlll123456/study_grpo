@@ -38,19 +38,24 @@ We would share training details about  config/wandb/model/log, also evaluation r
 
 📈 [wandb details](https://api.wandb.ai/links/xiaodonggua/eb471rlw) | 🔥 [Colab Inference](https://colab.research.google.com/drive/1TxjJ-M9J2lLW3zcKr7oeER3snXe0oWo4#scrollTo=VnkmSMGwZOhI) | 🤗 [Models](https://huggingface.co/xiaodongguaAIGC)
 
-| Model                 | 0.5B                                                                                         | 1.5B                                                                                         | 3B                                                                                           | 7B  |
-| --------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --- |
-| TargetModel           | [xiaodongguaAIGC/X-R1-0.5B](https://huggingface.co/xiaodongguaAIGC/X-R1-0.5B)                | [xiaodongguaAIGC/X-R1-1.5B](https://huggingface.co/xiaodongguaAIGC/X-R1-1.5B)                | [xiaodongguaAIGC/X-R1-3B](https://huggingface.co/xiaodongguaAIGC/X-R1-3B)                    |     |
-| Log                   | [[link]](https://drive.google.com/file/d/1m-w0B2L9o-bwGDgaOtWFLR0C0MAEBTFQ/view?usp=sharing) | [[link]](https://drive.google.com/file/d/11tBShY206Pu_SxWE0M-mG2_Cdf9mFNig/view?usp=sharing) | [[link]](https://drive.google.com/file/d/1t4WzsK0aMrULYKjKsKH29LsWQMeTDjTb/view?usp=sharing) |     |
-| GPU                   | 4x3090                                                                                       | 4x3090                                                                                       | 4x3090                                                                                       |     |
-| Base                  | Qwen/Qwen2.5-0.5B                                                                            | Qwen/Qwen2.5-1.5B                                                                            | Qwen/Qwen2.5-3B                                                                              |     |
-| Data                  | xiaodongguaAIGC/X-R1-750                                                                     | xiaodongguaAIGC/X-R1-750                                                                     | xiaodongguaAIGC/X-R1-750                                                                     |     |
-| Config: recipes       | X_R1_zero_0dot5B_config.yaml                                                                 | X_R1_zero_1dot5B_config.yaml                                                                 | X_R1_zero_3B_config.yaml                                                                     |     |
-| num_generations       | 16                                                                                           | 8                                                                                            | 4                                                                                            |     |
-| max_completion_length | 1024                                                                                         | 1024                                                                                         | 1024                                                                                         |     |
-| num_train_epochs      | 3                                                                                            | 3                                                                                            | 3                                                                                            |     |
-| Times                 | 1:14:10                                                                                      | 1:59:06                                                                                      | 2:23:06                                                                                      |     |
+We have confirmed the effectiveness of the X-R1 RL-Zero-training method for `0.5B/1.5B/3B-Base` model, We can observe that in the without-SFT, reinforcement learning has **Incentivizing** the model's reasoning abilities and format-following capabilities, and the experimental results of X-R1 are very encouraging.
 
+![image-20250215154927246](./README.assets/x-r1-base-result-curves.png)
+
+training config 
+
+| Model                 | 0.5B                                                         | 1.5B                                                         | 3B                                                           | 7B   |
+| --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ---- |
+| TargetModel           | [X-R1-0.5B](https://huggingface.co/xiaodongguaAIGC/X-R1-0.5B) | [X-R1-1.5B](https://huggingface.co/xiaodongguaAIGC/X-R1-1.5B) | [X-R1-3B](https://huggingface.co/xiaodongguaAIGC/X-R1-3B) |      |
+| Log                   | [[link]](https://drive.google.com/file/d/1m-w0B2L9o-bwGDgaOtWFLR0C0MAEBTFQ/view?usp=sharing) | [[link]](https://drive.google.com/file/d/11tBShY206Pu_SxWE0M-mG2_Cdf9mFNig/view?usp=sharing) | [[link]](https://drive.google.com/file/d/1t4WzsK0aMrULYKjKsKH29LsWQMeTDjTb/view?usp=sharing) |      |
+| GPU                   | 4x3090                                                       | 4x3090                                                       | 4x3090                                                       |      |
+| Base                  | Qwen/Qwen2.5-0.5B                                            | Qwen/Qwen2.5-1.5B                                            | Qwen/Qwen2.5-3B                                              |      |
+| Dataset               | X-R1-750                                     | X-R1-750                                     | X-R1-750                                     |      |
+| Config: recipes       | X_R1_zero_0dot5B_config.yaml                                 | X_R1_zero_1dot5B_config.yaml                                 | X_R1_zero_3B_config.yaml                                     |      |
+| num_generations       | 16                                                           | 8                                                            | 4                                                            |      |
+| max_completion_length | 1024                                                         | 1024                                                         | 1024                                                         |      |
+| num_train_epochs      | 3                                                            | 3                                                            | 3                                                            |      |
+| Times                 | 1:14:10                                                      | 1:59:06                                                      | 2:23:06                                                      |      |
 
 ### Example: 0.5B R1-Zero
 
@@ -69,10 +74,6 @@ src/x_r1/grpo.py \
 ```
 
 tips : use `--config recipes/X_R1_zero_0dot5B_config.yaml` for better learning reasoning and format
-
-#### accuracy reward
-
-![acc](./README.assets/X-R1-0.5B-acc-result.png)
 
 #### Aha Moment:
 
@@ -96,10 +97,17 @@ src/x_r1/grpo.py \
 
 #### reward curve
 
+X-R1 use 4x3090 ~16h training 3B-base with 7.5k chinese math problem.
+
+![image-20250215155828453](./README.assets/X-R1-math-cn-curve.png)
 
 #### Chinese Aha Moment
 
+[X-R1-3B-CN](xiaodongguaAIGC/X-R1-0.5B-CN) training [log](https://drive.google.com/file/d/1dPex_uiZ-4Lj2Jv8G8SWw6z0OsNSqLLM/view?usp=sharing) we track ”Aha Moment”
 
+![image-20250215165324051](./README.assets/X-R1-Math-cn-AhaMoment-1.png)
+
+![image-20250215165442658](./README.assets/X-R1-Math-cn-AhaMoment-2.png)
 
 ## Installation
 
