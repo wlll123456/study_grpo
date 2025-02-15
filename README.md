@@ -16,10 +16,10 @@ Inspired by [DeepSeek-R1](https://github.com/deepseek-ai/DeepSeek-R1) and [open-
 - We supply 0.75k/1.5k/7.5k dataset for fast train loop
 - We logging GRPO online sampling data to log file
 
-[ ] support QLoRA GRPO Training
 
 ## News
 
+- 2025.02.15 Release Chinese Training
 - 2025.02.13 Release X-R1-3B, whick better follow format. colab inference
 - 2025.02.12 Release X-R1-1.5B config/wandb/model/log
 - 2025.02.12: Release X-R1 first version
@@ -52,7 +52,7 @@ We would share training details about  config/wandb/model/log, also evaluation r
 | Times                 | 1:14:10                                                                                      | 1:59:06                                                                                      | 2:23:06                                                                                      |     |
 
 
-### running
+### Example: 0.5B R1-Zero
 
 0.5B, 4x3090.  if you have 4 GPUs, you should set `--num_processes=3`.  One GPU deploy vLLM as online inference engine, for faster GRPO sampling
 
@@ -68,16 +68,38 @@ src/x_r1/grpo.py \
 > ./output/x_r1_0dotB_sampling.log 2>&1
 ```
 
-### accuracy reward
+tips : use `--config recipes/X_R1_zero_0dot5B_config.yaml` for better learning reasoning and format
+
+#### accuracy reward
 
 ![acc](./README.assets/X-R1-0.5B-acc-result.png)
 
-### Aha Moment:
-
+#### Aha Moment:
 
 ***Wait**, that doesn't match either of our options. It seems like I made a **mistake** in my **assumptions**. **Let's go back** to the original equations*
 
 ![aha_moment](./README.assets/aha_moment_0.5B.png)
+
+### Examples: Chinese Math Reasoning
+
+X-R1 support chinese math reasoning, it's easy to make chinese `Aha Moment`, as follow
+
+```bash
+ACCELERATE_LOG_LEVEL=info \
+accelerate launch \
+--config_file recipes/zero3.yaml \
+--num_processes=3 \
+src/x_r1/grpo.py \
+--config recipes/examples/mathcn_zero_3B_config.yaml \
+> ./output/mathcn_3B_sampling.log 2>&1
+```
+
+#### reward curve
+
+
+#### Chinese Aha Moment
+
+
 
 ## Installation
 
@@ -128,7 +150,7 @@ and we check log file: `./output/test.log`
 
 ## Todo
 
-- support QloRA GRPO Trainning
+- support QLoRA GRPO Trainning
 - Release 7B config/result
 - add more rule reward
 - support more base model

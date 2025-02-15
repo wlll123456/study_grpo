@@ -107,8 +107,8 @@ class XGRPOTrainer(GRPOTrainer):
         else:
             # Regular generation path
             with unwrap_model_for_generation(model, self.accelerator) as unwrapped_model:
-                prompt_inputs['input_ids'].to(device)
-                prompt_inputs['attention_mask'].to(device)
+                prompt_inputs['input_ids'] = prompt_inputs['input_ids'].to(device)
+                prompt_inputs['attention_mask'] = prompt_inputs['attention_mask'].to(device)
 
                 prompt_completion_ids = unwrapped_model.generate(
                     **prompt_inputs, generation_config=self.generation_config
