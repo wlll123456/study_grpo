@@ -42,20 +42,20 @@ We have confirmed the effectiveness of the X-R1 RL-Zero-training method for `0.5
 
 ![X-R1-base-result-curves](./README.assets/X-R1-base-result-curves.png)
 
-training config 
+training config
 
-| Model                 | 0.5B                                                         | 1.5B                                                         | 3B                                                           | 7B   |
-| --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ---- |
-| TargetModel           | [X-R1-0.5B](https://huggingface.co/xiaodongguaAIGC/X-R1-0.5B) | [X-R1-1.5B](https://huggingface.co/xiaodongguaAIGC/X-R1-1.5B) | [X-R1-3B](https://huggingface.co/xiaodongguaAIGC/X-R1-3B) |      |
-| Log                   | [[link]](https://drive.google.com/file/d/1m-w0B2L9o-bwGDgaOtWFLR0C0MAEBTFQ/view?usp=sharing) | [[link]](https://drive.google.com/file/d/11tBShY206Pu_SxWE0M-mG2_Cdf9mFNig/view?usp=sharing) | [[link]](https://drive.google.com/file/d/1t4WzsK0aMrULYKjKsKH29LsWQMeTDjTb/view?usp=sharing) |      |
-| GPU                   | 4x3090                                                       | 4x3090                                                       | 4x3090                                                       |      |
-| Base                  | Qwen/Qwen2.5-0.5B                                            | Qwen/Qwen2.5-1.5B                                            | Qwen/Qwen2.5-3B                                              |      |
-| Dataset               | X-R1-750                                     | X-R1-750                                     | X-R1-750                                     |      |
-| Config: recipes       | X_R1_zero_0dot5B_config.yaml                                 | X_R1_zero_1dot5B_config.yaml                                 | X_R1_zero_3B_config.yaml                                     |      |
-| num_generations       | 16                                                           | 8                                                            | 4                                                            |      |
-| max_completion_length | 1024                                                         | 1024                                                         | 1024                                                         |      |
-| num_train_epochs      | 3                                                            | 3                                                            | 3                                                            |      |
-| Times                 | 1:14:10                                                      | 1:59:06                                                      | 2:23:06                                                      |      |
+| Model                 | 0.5B                                                                                         | 1.5B                                                                                         | 3B                                                                                           | 7B  |
+| --------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --- |
+| TargetModel           | [X-R1-0.5B](https://huggingface.co/xiaodongguaAIGC/X-R1-0.5B)                                | [X-R1-1.5B](https://huggingface.co/xiaodongguaAIGC/X-R1-1.5B)                                | [X-R1-3B](https://huggingface.co/xiaodongguaAIGC/X-R1-3B)                                    |     |
+| Log                   | [[link]](https://drive.google.com/file/d/1m-w0B2L9o-bwGDgaOtWFLR0C0MAEBTFQ/view?usp=sharing) | [[link]](https://drive.google.com/file/d/11tBShY206Pu_SxWE0M-mG2_Cdf9mFNig/view?usp=sharing) | [[link]](https://drive.google.com/file/d/1t4WzsK0aMrULYKjKsKH29LsWQMeTDjTb/view?usp=sharing) |     |
+| GPU                   | 4x3090                                                                                       | 4x3090                                                                                       | 4x3090                                                                                       |     |
+| Base                  | Qwen/Qwen2.5-0.5B                                                                            | Qwen/Qwen2.5-1.5B                                                                            | Qwen/Qwen2.5-3B                                                                              |     |
+| Dataset               | X-R1-750                                                                                     | X-R1-750                                                                                     | X-R1-750                                                                                     |     |
+| Config: recipes       | X_R1_zero_0dot5B_config.yaml                                                                 | X_R1_zero_1dot5B_config.yaml                                                                 | X_R1_zero_3B_config.yaml                                                                     |     |
+| num_generations       | 16                                                                                           | 8                                                                                            | 4                                                                                            |     |
+| max_completion_length | 1024                                                                                         | 1024                                                                                         | 1024                                                                                         |     |
+| num_train_epochs      | 3                                                                                            | 3                                                                                            | 3                                                                                            |     |
+| Times                 | 1:14:10                                                                                      | 1:59:06                                                                                      | 2:23:06                                                                                      |     |
 
 ### Example: 0.5B R1-Zero
 
@@ -124,6 +124,7 @@ and
 
 ```bash
 pip install -r requirements.txt
+pip install flash-attn
 ```
 
 ### quick start
