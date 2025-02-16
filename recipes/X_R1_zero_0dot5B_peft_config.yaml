@@ -59,4 +59,4 @@ lora_target_modules: ["q_proj","v_proj", "k_proj", "embed_tokens"]
 lora_alpha: 8
 lora_dropout: 0.0
 bias: "none"
-use_peft: false
+use_peft: true
