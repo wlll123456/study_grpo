@@ -1,1 +1,3 @@
-**TODO:** we will add more recipes in the future, just like alignment-handbook, this is the purpose of adding recipes to this project.
+- training X-R1-zero 0.5B/1.5B/3B
+- training chinese math reasoning
+- training LoRA in single GPU
