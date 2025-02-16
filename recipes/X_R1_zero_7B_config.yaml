@@ -25,7 +25,7 @@ bf16: true
 vllm_device: auto
 vllm_gpu_memory_utilization: 0.7
 do_eval: false
-eval_strategy: no
+eval_strategy: "no"
 eval_steps: 10
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
