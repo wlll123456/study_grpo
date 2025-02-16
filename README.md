@@ -10,6 +10,7 @@ Inspired by [DeepSeek-R1](https://github.com/deepseek-ai/DeepSeek-R1) and [open-
 
 ## Feature
 
+- 🔥Training with LoRA
 - 4x3090/4090 GPUs training 1hour, 💰cost < 7 dollar, 10min 37'step output “aha Moment“ 💡
 - 0.5B scale model RL training
 - support BIGGER model: 1.5B/7B/32B...
@@ -19,6 +20,7 @@ Inspired by [DeepSeek-R1](https://github.com/deepseek-ai/DeepSeek-R1) and [open-
 
 ## News
 
+- 2025.02.16 Support LoRA
 - 2025.02.15 Release Chinese Training
 - 2025.02.13 Release X-R1-3B, whick better follow format. colab inference
 - 2025.02.12 Release X-R1-1.5B config/wandb/model/log
@@ -69,11 +71,11 @@ accelerate launch \
 --config_file recipes/zero3.yaml \
 --num_processes=3 \
 src/x_r1/grpo.py \
---config recipes/X_R1_zero_0dot5B_config.yaml \
+--config recipes/X_R1_zero_0dot5B_config_peft.yaml \
 > ./output/x_r1_0dotB_sampling.log 2>&1
 ```
 
-tips : use `--config recipes/X_R1_zero_0dot5B_config.yaml` for better learning reasoning and format
+tips : use `--config recipes/X_R1_zero_3B_config.yaml` for better learning reasoning and format
 
 #### Aha Moment:
 
@@ -135,7 +137,7 @@ for test environment:
 mkdir output
 ```
 
-\[option\]: single GPU:
+\[option\]: single GPU with LoRA:
 
 ```shell
 ACCELERATE_LOG_LEVEL=info \
@@ -143,7 +145,7 @@ accelerate launch \
 --config_file recipes/zero1.yaml \
 --num_processes=1 \
 src/x_r1/grpo.py \
---config recipes/X_R1_test_env_single.yaml \
+--config recipes/X_R1_zero_0dot5B_peft_config.yaml \
 > ./output/x_r1_test_sampling.log 2>&1
 ```
 

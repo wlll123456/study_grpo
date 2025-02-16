@@ -1,5 +1,5 @@
 # This is X-R1(https://github.com/dhcode-cpp/X-R1) project training config:
-# required >  4x3090(24G)/4090(24G)
+# required >=  4x3090(24G)/4090(24G)
 # running time ~1h
 
 # Model arguments

@@ -27,24 +27,74 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 from configs import GRPOConfig
-from rewards import REWARD_FUNCS_REGISTRY
+from rewards import (
+    accuracy_reward,
+    format_reward,
+    get_cosine_scaled_reward,
+    get_repetition_penalty_reward,
+    len_reward,
+    reasoning_steps_reward,
+)
 from utils.callbacks import get_callbacks
 from x_grpo_trainer import XGRPOTrainer
 from trl import ModelConfig, ScriptArguments, TrlParser, get_peft_config
+# from peft import lora
 
 
 logger = logging.getLogger(__name__)
+
+import wandb
+
+
+def init_wandb_training(training_args):
+    """
+    Helper function for setting up Weights & Biases logging tools.
+    """
+    if training_args.wandb_entity is not None:
+        os.environ["WANDB_ENTITY"] = training_args.wandb_entity
+    if training_args.wandb_project is not None:
+        os.environ["WANDB_PROJECT"] = training_args.wandb_project
+
 
 
 @dataclass
 class GRPOScriptArguments(ScriptArguments):
     reward_funcs: list[str] = field(
         default_factory=lambda: ["accuracy", "format"],
-        # default_factory=lambda: ["accuracy", ],
         metadata={
-            "help": f"List of reward functions. Possible values: {', '.join(REWARD_FUNCS_REGISTRY.keys())}"
+            "help": "List of reward functions. Possible values: 'accuracy', 'format', 'reasoning_steps', 'cosine', 'repetition_penalty', 'length'"
         },
     )
+    cosine_min_value_wrong: float = field(
+        default=0.0,
+        metadata={"help": "Minimum reward for wrong answers"},
+    )
+    cosine_max_value_wrong: float = field(
+        default=-0.5,
+        metadata={"help": "Maximum reward for wrong answers"},
+    )
+    cosine_min_value_correct: float = field(
+        default=0.5,
+        metadata={"help": "Minimum reward for correct answers"},
+    )
+    cosine_max_value_correct: float = field(
+        default=1.0,
+        metadata={"help": "Maximum reward for correct answers"},
+    )
+    cosine_max_len: int = field(
+        default=1000,
+        metadata={"help": "Maximum length for scaling"},
+    )
+
+    repetition_n_grams: int = field(
+        default=3,
+        metadata={"help": "Number of n-grams for repetition penalty reward"},
+    )
+    repetition_max_penalty: float = field(
+        default=-1.0,
+        metadata={"help": "Maximum (negative) penalty for for repetition penalty reward"},
+    )
+
 
 
 SYSTEM_PROMPT = (
@@ -90,10 +140,30 @@ def main(script_args, training_args, model_args):
     if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
         logger.info(f"Checkpoint detected, resuming training at {last_checkpoint=}.")
 
+    if "wandb" in training_args.report_to:
+        init_wandb_training(training_args)
+
     # Load the dataset
     dataset = load_dataset(script_args.dataset_name, name=script_args.dataset_config)
 
     # Get reward functions
+    REWARD_FUNCS_REGISTRY = {
+        "accuracy": accuracy_reward,
+        "format": format_reward,
+        "reasoning_steps": reasoning_steps_reward,
+        "cosine": get_cosine_scaled_reward(
+            min_value_wrong=script_args.cosine_min_value_wrong,
+            max_value_wrong=script_args.cosine_max_value_wrong,
+            min_value_correct=script_args.cosine_min_value_correct,
+            max_value_correct=script_args.cosine_max_value_correct,
+            max_len=script_args.cosine_max_len,
+        ),
+        "repetition_penalty": get_repetition_penalty_reward(
+            ngram_size=script_args.repetition_n_grams,
+            max_penalty=script_args.repetition_max_penalty,
+        ),
+        "length": len_reward,
+    }
     reward_funcs = [REWARD_FUNCS_REGISTRY[func] for func in script_args.reward_funcs]
 
     # Format into conversation
@@ -125,19 +195,23 @@ def main(script_args, training_args, model_args):
         use_cache=False if training_args.gradient_checkpointing else True,
     )
 
-    model = AutoModelForCausalLM.from_pretrained( model_args.model_name_or_path, load_in_4bit=False, **model_kwargs)
+    # model = AutoModelForCausalLM.from_pretrained(**model_kwargs)
+    print('-------')
+    print(get_peft_config(model_args))
+    print('-------')
 
     print(model_args.model_name_or_path,)
     #############################
     # Initialize the XGRPO trainer
     #############################
     trainer = XGRPOTrainer(
-        # model=model_args.model_name_or_path,
-        model = model,
+        model=model_args.model_name_or_path,
+        # model = model,
         reward_funcs=reward_funcs,
         args=training_args,
         train_dataset=dataset[script_args.dataset_train_split],
         eval_dataset=dataset[script_args.dataset_test_split] if training_args.eval_strategy != "no" else None,
+        peft_config=get_peft_config(model_args),
         callbacks=get_callbacks(training_args, model_args),
     )
 
@@ -179,4 +253,6 @@ def main(script_args, training_args, model_args):
 if __name__ == "__main__":
     parser = TrlParser((GRPOScriptArguments, GRPOConfig, ModelConfig))
     script_args, training_args, model_args = parser.parse_args_and_config()
-    main(script_args, training_args, model_args)
+    print(training_args)
+    print(model_args)
+    main(script_args, training_args, model_args )

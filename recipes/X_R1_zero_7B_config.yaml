@@ -1,5 +1,5 @@
 # This is X-R1(https://github.com/dhcode-cpp/X-R1) project training config:
-# required >  8 x 80G GPU
+# required >=  8 x 80G GPU
 # running time ~32h
 
 # Model arguments
