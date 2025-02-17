@@ -18,7 +18,7 @@ import os
 import textwrap
 import warnings
 from collections import defaultdict
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Sized, Union
 from unittest.mock import patch
 
 import torch
@@ -26,16 +26,40 @@ import torch.utils.data
 import torch.nn as nn
 import transformers
 from accelerate.utils import broadcast_object_list, gather, gather_object, is_peft_model, set_seed
+from accelerate.utils.other import is_compiled_module
+from datasets import Dataset, IterableDataset
+from packaging import version
+from torch import nn
+from torch.utils.data import Sampler
 from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    GenerationConfig,
     PreTrainedModel,
+    PreTrainedTokenizerBase,
     Trainer,
+    TrainerCallback,
+    is_wandb_available,
 )
+from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
+from transformers.utils import is_peft_available
 from trl.trainer import GRPOTrainer
 from trl.data_utils import apply_chat_template, is_conversational, maybe_apply_chat_template
-from trl.models import unwrap_model_for_generation
+from trl.models import create_reference_model, prepare_deepspeed, unwrap_model_for_generation
+from trl.import_utils import is_vllm_available
+from trl.trainer.callbacks import SyncRefModelCallback
 from trl.trainer.grpo_config import GRPOConfig
 from trl.trainer.utils import  pad, selective_log_softmax
-import wandb
+
+if is_peft_available():
+    from peft import PeftConfig, get_peft_model
+
+if is_vllm_available():
+    from vllm import LLM, SamplingParams
+
+if is_wandb_available():
+    import wandb
 
 
 
@@ -60,7 +84,6 @@ RewardFunc = Union[str, PreTrainedModel, Callable[[list, list], list[float]]]
 
 class XGRPOTrainer(GRPOTrainer):
     # base trl GRPO_trainer
-
 
     # Get the per-token log probabilities for the completions for the model and the reference model
     def _get_per_token_logps(self, model, input_ids, attention_mask, logits_to_keep):
@@ -126,6 +149,8 @@ class XGRPOTrainer(GRPOTrainer):
             # Pad the completions, and concatenate them with the prompts
             completion_ids = [torch.tensor(ids, device=device) for ids in completion_ids]
             completion_ids = pad(completion_ids, padding_value=self.processing_class.pad_token_id)
+            prompt_ids = prompt_ids.to(device)
+            prompt_mask = prompt_mask.to(device)
             prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
         else:
             # Regular generation path
@@ -146,7 +171,6 @@ class XGRPOTrainer(GRPOTrainer):
             output_string = self.processing_class.batch_decode(completion_ids, skip_special_tokens=True)
             for prompt, completion in zip(prompt_string, output_string):
                 print('='*100)
-                # generated_text = output_t.text
                 print("【USER】: ", prompt )
                 print("\n【ASSISTANT】:", completion)
 
@@ -167,14 +191,11 @@ class XGRPOTrainer(GRPOTrainer):
             # base 作为 ref model
             # base + Lora 作为 policy model
             if self.ref_model is not None:
-                print('*'*400)
                 print('is not peft')
                 ref_per_token_logps = self._get_per_token_logps(
                     self.ref_model, prompt_completion_ids, attention_mask, logits_to_keep
                 )
             else:
-
-                print('*'*400)
                 print('is peft')
                 with self.accelerator.unwrap_model(self.model).disable_adapter():
                     ref_per_token_logps = self._get_per_token_logps(

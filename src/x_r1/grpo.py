@@ -38,7 +38,7 @@ from rewards import (
 from utils.callbacks import get_callbacks
 from x_grpo_trainer import XGRPOTrainer
 from trl import ModelConfig, ScriptArguments, TrlParser, get_peft_config
-# from peft import lora
+from peft import LoraConfig, PeftModel, get_peft_model
 
 
 logger = logging.getLogger(__name__)
@@ -186,7 +186,7 @@ def main(script_args, training_args, model_args):
         model_args.torch_dtype if model_args.torch_dtype in ["auto", None] else getattr(torch, model_args.torch_dtype)
     )
 
-    training_args.gradient_checkpointing = True
+    training_args.gradient_checkpointing = False
     model_kwargs = dict(
         revision=model_args.model_revision,
         trust_remote_code=model_args.trust_remote_code,
@@ -195,12 +195,14 @@ def main(script_args, training_args, model_args):
         use_cache=False if training_args.gradient_checkpointing else True,
     )
 
-    # model = AutoModelForCausalLM.from_pretrained(**model_kwargs)
-    print('-------')
-    print(get_peft_config(model_args))
-    print('-------')
+    # model = AutoModelForCausalLM.from_pretrained(**model_kwargs, pretrained_model_name_or_path = model_args.model_name_or_path)
+    training_args.model_init_kwargs = model_kwargs
+    # peft_config=get_peft_config(model_args)
+    # if peft_config not None:
+    #     model = get_peft_model(model, peft_config)
+    # print(model)
 
-    print(model_args.model_name_or_path,)
+
     #############################
     # Initialize the XGRPO trainer
     #############################
@@ -253,6 +255,4 @@ def main(script_args, training_args, model_args):
 if __name__ == "__main__":
     parser = TrlParser((GRPOScriptArguments, GRPOConfig, ModelConfig))
     script_args, training_args, model_args = parser.parse_args_and_config()
-    print(training_args)
-    print(model_args)
     main(script_args, training_args, model_args )
