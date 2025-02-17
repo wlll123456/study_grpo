@@ -27,7 +27,6 @@ gradient_accumulation_steps: 4
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
   use_reentrant: false
-hub_model_id: Qwen/Qwen2.5-7B
 hub_strategy: every_save
 learning_rate: 3.0e-06
 log_level: info
@@ -39,7 +38,7 @@ num_generations: 4
 max_completion_length: 256
 max_steps: -1
 num_train_epochs: 2
-output_dir: output/X-R1-test
+output_dir: output/X-R1-7B-LoRA
 overwrite_output_dir: true
 per_device_eval_batch_size: 1
 per_device_train_batch_size: 1

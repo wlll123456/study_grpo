@@ -205,6 +205,7 @@ def main(script_args, training_args, model_args):
     # model = AutoModelForCausalLM.from_pretrained(**model_kwargs, pretrained_model_name_or_path = model_args.model_name_or_path)
     training_args.model_init_kwargs = model_kwargs
     # peft_config=get_peft_config(model_args)
+    # print(peft_config)
     # if peft_config not None:
     #     model = get_peft_model(model, peft_config)
     # print(model)
@@ -220,9 +221,11 @@ def main(script_args, training_args, model_args):
         args=training_args,
         train_dataset=dataset[script_args.dataset_train_split],
         eval_dataset=dataset[script_args.dataset_test_split] if training_args.eval_strategy != "no" else None,
-        peft_config=get_peft_config(model_args),
+        peft_config=get_peft_config(model_args), # LoRA parameter
         callbacks=get_callbacks(training_args, model_args),
     )
+
+    print(trainer)
 
     ###############
     # Training loop
