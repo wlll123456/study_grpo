@@ -84,6 +84,19 @@ tips : use `--config recipes/X_R1_zero_3B_config.yaml` for better learning reaso
 
 ![aha_moment](./README.assets/aha_moment_0.5B.png)
 
+#### benchmark evaluation
+
+we use vllm as backend, to evaluate benchmark. output accuracy-metric and format-metric, and json file 
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 python ./src/x_r1/benchmark.py \
+	--model_name='xiaodongguaAIGC/X-R1-0.5B' \
+    --dataset_name='HuggingFaceH4/MATH-500' \
+	--output_name='./output/result_benchmark_math500'  \
+	--max_output_tokens=1024 \
+	--num_gpus=2
+```
+
 ### Example: Chinese Math Reasoning
 
 X-R1 support chinese math reasoning, it's easy to make chinese `Aha Moment`, as follow
@@ -112,18 +125,6 @@ X-R1 use 4x3090 ~16h training 3B-base with 7.5k chinese math problem.
 
 ![X-R1-Math-cn-AhaMoment-2](./README.assets/X-R1-Math-cn-AhaMoment-2.png)
 
-#### benchmark evaluation
-
-we use vllm as backend, to evaluate benchmark. output accuracy-metric and format-metric.
-
-```
-CUDA_VISIBLE_DEVICES=0 python ./src/x_r1/benchmark.py \
-	--model_name='xiaodongguaAIGC/X-R1-3B' \
-    --dataset_name='HuggingFaceH4/MATH-500' \
-	--output_name='./output/result_benchmark_math500'  \
-	--max_output_tokens=1024 \
-	--num_gpus=1
-```
 
 
 ### Example: GRPO + LoRA
