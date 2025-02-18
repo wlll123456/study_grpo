@@ -20,6 +20,7 @@ Inspired by [DeepSeek-R1](https://github.com/deepseek-ai/DeepSeek-R1) and [open-
 
 ## News
 
+- 2025.02.18 Suppor LoRA+Zero3, Medical and llm-as-a-reward
 - 2025.02.16 Support LoRA
 - 2025.02.15 Release Chinese Training
 - 2025.02.13 Release X-R1-3B, whick better follow format. colab inference
@@ -83,7 +84,7 @@ tips : use `--config recipes/X_R1_zero_3B_config.yaml` for better learning reaso
 
 ![aha_moment](./README.assets/aha_moment_0.5B.png)
 
-### Examples: Chinese Math Reasoning
+### Example: Chinese Math Reasoning
 
 X-R1 support chinese math reasoning, it's easy to make chinese `Aha Moment`, as follow
 
@@ -110,6 +111,31 @@ X-R1 use 4x3090 ~16h training 3B-base with 7.5k chinese math problem.
 ![X-R1-Math-cn-AhaMoment-1](./README.assets/X-R1-Math-cn-AhaMoment-1.png)
 
 ![X-R1-Math-cn-AhaMoment-2](./README.assets/X-R1-Math-cn-AhaMoment-2.png)
+
+### Example: GRPO + LoRA
+
+1. multi-gpu run:
+
+```bash
+ACCELERATE_LOG_LEVEL=info 
+accelerate launch 
+--config_file recipes/zero3.yaml 
+--num_processes=3 src/x_r1/grpo.py 
+--config recipes/examples/X_R1_zero_7B_peft_usevllm_config.yaml.yaml
+> ./output/test_7b_lora_sampling.log 2>&1
+```
+
+2. single-gpu 3090 training 7B LoRA run:
+
+```bash
+ACCELERATE_LOG_LEVEL=info 
+accelerate launch 
+--config_file recipes/zero3.yaml 
+--num_processes=1 src/x_r1/grpo.py 
+--config recipes/examples/X_R1_zero_7B_peft_novllm_config.yaml.yaml
+> ./output/test_7b_lora_sampling.log 2>&1
+```
+
 
 ## Installation
 
