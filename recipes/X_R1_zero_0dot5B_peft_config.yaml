@@ -4,7 +4,7 @@
 # running time ~8h
 
 # Model arguments
-model_name_or_path: Qwen/Qwen2.5-1.5B
+model_name_or_path: Qwen/Qwen2.5-0.5B
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
@@ -27,8 +27,6 @@ gradient_accumulation_steps: 1
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
   use_reentrant: false
-hub_model_id: Qwen/Qwen2.5-1.5B
-hub_strategy: every_save
 learning_rate: 3.0e-06
 log_level: info
 logging_steps: 10
@@ -38,7 +36,7 @@ max_prompt_length: 256
 num_generations: 4
 max_completion_length: 128
 max_steps: -1
-num_train_epochs: 3
+num_train_epochs: 2
 output_dir: output/X-R1-test
 overwrite_output_dir: true
 per_device_eval_batch_size: 1

@@ -1,30 +1,23 @@
 # This is X-R1(https://github.com/dhcode-cpp/X-R1) project training config:
-# required >= 4xA100(>40G)
-# running time 
-
-# multi-gpu LoRA NOT running zero3
-
-# ACCELERATE_LOG_LEVEL=info 
-# accelerate launch 
-# --config_file recipes/zero2.yaml 
-# --num_processes=3 src/x_r1/grpo.py 
-# --config recipes/examples/X_R1_zero_five3090_7B_peft_config.yaml
-# > ./output/test_7b_lora_sampling.log 2>&1
+# required >= 1x3090(24G)
+#
+# running time ~8h
 
 # Model arguments
-model_name_or_path: ./../Qwen/Qwen2.5-1.5b
+model_name_or_path: Qwen/Qwen2.5-7b
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
 
 # Data training arguments
-dataset_name: xiaodongguaAIGC/X-R1-750 #  750 / 1500 / 7500
+dataset_name: xiaodongguaAIGC/X-R1-TAL-SCQ2K #  X-R1-TAL-SCQ5K
 dataset_configs:
 - train
+num_processes: 1
 
 # GRPO trainer config
 bf16: true
-use_vllm: true
+use_vllm: false
 vllm_device: "auto"
 vllm_gpu_memory_utilization: 0.7
 do_eval: no
@@ -42,7 +35,7 @@ logging_strategy: steps
 lr_scheduler_type: cosine
 max_prompt_length: 256
 num_generations: 4
-max_completion_length: 128
+max_completion_length: 256
 max_steps: -1
 num_train_epochs: 2
 output_dir: output/X-R1-7B-LoRA
