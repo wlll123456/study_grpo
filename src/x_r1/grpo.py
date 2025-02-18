@@ -261,6 +261,13 @@ def main(script_args, training_args, model_args):
         trainer.model.config.use_cache = True
         trainer.model.config.save_pretrained(training_args.output_dir)
 
+    # if training_args.do_eval:
+    #     logger.info("*** Evaluate ***")
+    #     metrics = trainer.evaluate()
+    #     metrics["eval_samples"] = len(dataset[script_args.dataset_test_split])
+    #     trainer.log_metrics("eval", metrics)
+    #     trainer.save_metrics("eval", metrics)
+
 
 if __name__ == "__main__":
     parser = TrlParser((GRPOScriptArguments, GRPOConfig, ModelConfig))

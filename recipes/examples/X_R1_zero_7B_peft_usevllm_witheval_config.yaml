@@ -8,7 +8,7 @@
 # accelerate launch 
 # --config_file recipes/zero3.yaml 
 # --num_processes=3 src/x_r1/grpo.py 
-# --config recipes/examples/X_R1_zero_7B_peft_usevllm_config.yaml
+# --config recipes/examples/X_R1_zero_7B_peft_usevllm_witheval_config.yaml
 # > ./output/test_7b_lora_sampling.log 2>&1
 
 # Model arguments
@@ -27,10 +27,7 @@ bf16: true
 use_vllm: true
 vllm_device: "auto"
 vllm_gpu_memory_utilization: 0.7
-do_eval: no
-eval_strategy: "no"
-eval_steps: 10
-gradient_accumulation_steps: 4
+gradient_accumulation_steps: 1
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
   use_reentrant: false
@@ -42,19 +39,23 @@ logging_strategy: steps
 lr_scheduler_type: cosine
 max_prompt_length: 256
 num_generations: 3
-max_completion_length: 128
+max_completion_length: 512
 max_steps: -1
-num_train_epochs: 2
+num_train_epochs: 1
 output_dir: output/X-R1-7B-LoRA
 overwrite_output_dir: true
-per_device_eval_batch_size: 1
-per_device_train_batch_size: 1
+per_device_train_batch_size: 4
 push_to_hub: False
 report_to:
 - wandb
 save_strategy: "epoch"
 seed: 42
 warmup_ratio: 0.1
+
+# GRPO trainer config for evaluate
+do_eval: true
+eval_strategy: "epoch" # "no", "steps", "epoch"
+per_device_eval_batch_size: 8
 
 
 # lora config
