@@ -107,6 +107,38 @@ def accuracy_reward(completions, solution, **kwargs):
     return rewards
 
 
+def accuracy_answer_reward(completion, answer, **kwargs):
+    """Reward function that checks if the completion is the same as the ground truth."""
+    '''
+    input is completion string, answer is extracted gold answer.
+    '''
+    gold_parsed = answer
+    if len(gold_parsed) != 0:
+        answer_parsed = parse(
+            completion,
+            extraction_config=[
+                LatexExtractionConfig(
+                    normalization_config=NormalizationConfig(
+                        nits=False,
+                        malformed_operators=False,
+                        basic_latex=True,
+                        equations=True,
+                        boxed="all",
+                        units=True,
+                    ),
+                    # Ensures that boxed is tried first
+                    boxed_match_priority=0,
+                    try_extract_without_anchor=False,
+                )
+            ],
+            extraction_mode="first_match",
+        )
+        reward = float(verify(answer_parsed, gold_parsed))
+        print('-'*100)
+        print('\nanswer_parsed:', answer_parsed, '\ngold_parsed:', gold_parsed, '\nreward:', reward)
+    return reward
+
+
 def format_reward(completions, **kwargs):
     """Reward function that checks if the completion has a specific format."""
     pattern = r"^<think>.*?</think><answer>.*?</answer>$"

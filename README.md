@@ -20,7 +20,7 @@ Inspired by [DeepSeek-R1](https://github.com/deepseek-ai/DeepSeek-R1) and [open-
 
 ## News
 
-- 2025.02.18 Suppor LoRA+Zero3, Medical and llm-as-a-reward
+- 2025.02.18 Suppor LoRA+Zero3, Medical and llm-as-a-reward, add MATH500 benchmark evaluation result.
 - 2025.02.16 Support LoRA
 - 2025.02.15 Release Chinese Training
 - 2025.02.13 Release X-R1-3B, whick better follow format. colab inference
@@ -111,6 +111,20 @@ X-R1 use 4x3090 ~16h training 3B-base with 7.5k chinese math problem.
 ![X-R1-Math-cn-AhaMoment-1](./README.assets/X-R1-Math-cn-AhaMoment-1.png)
 
 ![X-R1-Math-cn-AhaMoment-2](./README.assets/X-R1-Math-cn-AhaMoment-2.png)
+
+#### benchmark evaluation
+
+we use vllm as backend, to evaluate benchmark. output accuracy-metric and format-metric.
+
+```
+CUDA_VISIBLE_DEVICES=0 python ./src/x_r1/benchmark.py \
+	--model_name='xiaodongguaAIGC/X-R1-3B' \
+    --dataset_name='HuggingFaceH4/MATH-500' \
+	--output_name='./output/result_benchmark_math500'  \
+	--max_output_tokens=1024 \
+	--num_gpus=1
+```
+
 
 ### Example: GRPO + LoRA
 
