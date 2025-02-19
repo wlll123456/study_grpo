@@ -18,7 +18,7 @@ use_vllm: true
 output_dir: output/X-R1-7B
 gradient_accumulation_steps: 4
 max_prompt_length: 256
-num_generations: 8
+num_generations: 12
 max_completion_length: 1024
 
 bf16: true
@@ -39,7 +39,7 @@ max_steps: -1
 num_train_epochs: 3
 overwrite_output_dir: true
 per_device_eval_batch_size: 1
-per_device_train_batch_size: 1
+per_device_train_batch_size: 4
 push_to_hub: False
 report_to:
 - wandb

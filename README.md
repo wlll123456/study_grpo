@@ -72,7 +72,7 @@ accelerate launch \
 --config_file recipes/zero3.yaml \
 --num_processes=3 \
 src/x_r1/grpo.py \
---config recipes/X_R1_zero_0dot5B_config_peft.yaml \
+--config recipes/X_R1_zero_0dot5B_config.yaml \
 > ./output/x_r1_0dotB_sampling.log 2>&1
 ```
 
@@ -203,6 +203,49 @@ src/x_r1/grpo.py \
 ```
 
 and we check log file: `./output/test.log`
+
+## Q & A
+
+### How to setting correct batch_Size and num_generations
+
+we have 4gpu(1 vLLM + 3 training), setting config is:
+
+```yaml
+per_device_train_batch_size: 1
+num_generations: 4
+```
+
+running with `--num_processes=3`: 
+
+```text
+ValueError: The global train batch size (3 x 1) must be evenly divisible by the number of generations per prompt (4). Given the current train batch size, the valid values for the number of generations are: [3].
+```
+
+
+( `per_device_train_batch_size` * `num_generations` ) % `num_processes` == 0
+
+we should set
+
+```yaml
+# example 1
+per_device_train_batch_size: 1
+num_generations: 3
+# 1 * 3 % 3 = 0
+
+# example 2
+per_device_train_batch_size: 4
+num_generations: 6
+# 4 * 6 % 3 = 0
+```
+
+if your have 8GPU(1vllm + 7training)
+
+```yaml
+per_device_train_batch_size: 4
+num_generations: 14
+# 4 * 14 % 7 = 0
+```
+
 
 ## Todo
 

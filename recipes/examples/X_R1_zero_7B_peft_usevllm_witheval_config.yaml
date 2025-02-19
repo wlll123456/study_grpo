@@ -38,13 +38,13 @@ logging_steps: 10
 logging_strategy: steps
 lr_scheduler_type: cosine
 max_prompt_length: 256
-num_generations: 3
+num_generations: 6
 max_completion_length: 512
 max_steps: -1
 num_train_epochs: 1
 output_dir: output/X-R1-7B-LoRA
 overwrite_output_dir: true
-per_device_train_batch_size: 1
+per_device_train_batch_size: 4
 push_to_hub: False
 report_to:
 - wandb

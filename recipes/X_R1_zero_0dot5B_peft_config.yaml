@@ -4,7 +4,7 @@
 # running time ~8h
 
 # Model arguments
-model_name_or_path: Qwen/Qwen2.5-0.5B
+model_name_or_path: Qwen/Qwen2.5-1.5B
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
@@ -23,7 +23,7 @@ vllm_gpu_memory_utilization: 0.7
 do_eval: no
 eval_strategy: "no"
 eval_steps: 10
-gradient_accumulation_steps: 1
+gradient_accumulation_steps: 4
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
   use_reentrant: false
@@ -33,10 +33,10 @@ logging_steps: 10
 logging_strategy: steps
 lr_scheduler_type: cosine
 max_prompt_length: 256
-num_generations: 4
+num_generations: 6
 max_completion_length: 128
 max_steps: -1
-num_train_epochs: 2
+num_train_epochs: 3
 output_dir: output/X-R1-test
 overwrite_output_dir: true
 per_device_eval_batch_size: 1
