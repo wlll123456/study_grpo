@@ -353,10 +353,8 @@ class XGRPOTrainer(GRPOTrainer):
     # https://github.com/huggingface/trl/pull/2873
     def _move_model_to_vllm(self):
         # https://github.com/huggingface/trl/issues/2840#issuecomment-2662747485
-        # for param in self.model.parameters():
-            # param.ds_active_sub_modules.clear()
-
-
+        for param in self.model.parameters():
+            param.ds_active_sub_modules.clear()
         with unwrap_model_for_generation(
             self.model, self.accelerator, gather_deepspeed3_params=self.args.ds3_gather_for_generation
         ) as unwrapped_model:
