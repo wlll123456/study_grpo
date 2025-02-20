@@ -3,7 +3,7 @@
 # running time 2~3h
 
 # Model arguments
-model_name_or_path: /root/Projects/Qwen/Qwen2.5-1.5b
+model_name_or_path: Qwen/Qwen2.5-1.5B
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
@@ -12,10 +12,9 @@ attn_implementation: flash_attention_2
 dataset_name: xiaodongguaAIGC/X-R1-750
 dataset_configs:
 - train
-num_processes: 3
 
 # GRPO trainer config
-
+beta: 0 # without KL
 bf16: true
 use_vllm: true
 vllm_device: auto
@@ -33,17 +32,19 @@ logging_steps: 10
 logging_strategy: steps
 lr_scheduler_type: cosine
 max_prompt_length: 256
-num_generations: 12
+num_generations: 3
 max_completion_length: 1024
 max_steps: -1
 num_train_epochs: 3
 output_dir: output/X-R1-1.5B
 overwrite_output_dir: true
 per_device_eval_batch_size: 1
-per_device_train_batch_size: 4
+per_device_train_batch_size: 2
 push_to_hub: False
 report_to:
 - wandb
 save_strategy: "epoch"
 seed: 42
 warmup_ratio: 0.1
+
+

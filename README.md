@@ -151,6 +151,19 @@ accelerate launch
 > ./output/test_7b_lora_sampling.log 2>&1
 ```
 
+### Example: GRPO without KL
+
+set KL iterm `beta: 0.0` and ignore `ref_model` , improve 20% performance.
+
+```bash 
+accelerate launch \
+--config_file recipes/zero3.yaml \
+--num_processes=3 \
+src/x_r1/grpo.py \
+--config recipes/X_R1_zero_1dot5B_noKL_config.yaml \
+> ./output/test_1dot5B_sampling.log 2>&1
+```
+
 
 ## Installation
 
