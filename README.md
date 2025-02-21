@@ -235,28 +235,32 @@ ValueError: The global train batch size (3 x 1) must be evenly divisible by the 
 ```
 
 
-( `per_device_train_batch_size` * `num_generations` ) % `num_processes` == 0
+( `per_device_train_batch_size` * `num_processes` ) % `num_generations` == 0
+
 
 we should set
 
 ```yaml
 # example 1
+num_processes: 3
 per_device_train_batch_size: 1
 num_generations: 3
 # 1 * 3 % 3 = 0
 
 # example 2
+num_processes: 3
 per_device_train_batch_size: 4
 num_generations: 6
-# 4 * 6 % 3 = 0
+# 4 * 3 % 6 = 0
 ```
 
 if your have 8GPU(1vllm + 7training)
 
 ```yaml
+num_processes: 7
 per_device_train_batch_size: 4
 num_generations: 14
-# 4 * 14 % 7 = 0
+# 4 * 7 % 14 = 0
 ```
 
 
