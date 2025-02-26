@@ -3,7 +3,7 @@
 # running time 2~3h
 
 # Model arguments
-model_name_or_path: ./output/qwen2.5-3b
+model_name_or_path: Qwen/Qwen2.5-3B
 model_revision: main
 torch_dtype: bfloat16
 attn_implementation: flash_attention_2
@@ -23,13 +23,13 @@ vllm_gpu_memory_utilization: 0.5
 do_eval: false
 eval_strategy: "no"
 eval_steps: 10
-gradient_accumulation_steps: 4
+gradient_accumulation_steps: 8
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
   use_reentrant: false
 learning_rate: 3.0e-06
 log_level: info
-logging_steps: 10
+logging_steps: 1
 logging_strategy: steps
 lr_scheduler_type: cosine
 max_prompt_length: 256

@@ -69,19 +69,6 @@ if is_wandb_available():
 RewardFunc = Union[str, PreTrainedModel, Callable[[list, list], list[float]]]
 
 
-# # Get the per-token log probabilities for the completions for the model and the reference model
-# def _get_per_token_logps(self, model, input_ids, attention_mask, logits_to_keep):
-#     # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
-#     logits = model(input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1).logits
-#     logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
-
-#     input_ids = input_ids[:, -logits_to_keep:]
-#     # For transformers<=4.48, logits_to_keep argument isn't supported, so here we drop logits ourselves.
-#     # See https://github.com/huggingface/trl/issues/2770
-#     logits = logits[:, -logits_to_keep:]
-#     return selective_log_softmax(logits, input_ids)  #  compute logprobs for the input tokens
-
-
 class XGRPOTrainer(GRPOTrainer):
     # base trl GRPO_trainer
 
@@ -137,23 +124,28 @@ class XGRPOTrainer(GRPOTrainer):
                 )
 
         if peft_config is not None:
+            if not is_peft_available():
+                raise ImportError("PEFT is required to use `peft_config`. Run `pip install peft`.")
             model = get_peft_model(model, peft_config)
 
-        print('peft_config', peft_config)
-
+        # Enable gradient checkpointing if requested
+        if args.gradient_checkpointing:
+            model = self._enable_gradient_checkpointing(model, args)
 
         # Reference model
-        if not is_peft_model(model)  and is_deepspeed_zero3_enabled():
+        self.beta = args.beta
+        if self.beta == 0.0:
+            # If beta is 0.0, the reference model is not needed
+            self.ref_model = None
+        elif is_deepspeed_zero3_enabled():
             self.ref_model = AutoModelForCausalLM.from_pretrained(model_id, **model_init_kwargs)
-        elif not is_peft_model(model):
-            # If PEFT configuration is not provided, create a reference model based on the initial model.
-            self.ref_model = create_reference_model(model)
-        else:
+        elif is_peft_model(model):
             # If PEFT is used, the reference model is not needed since the adapter can be disabled
             # to revert to the initial model.
             self.ref_model = None
-        
-        print('ref_model', self.ref_model)
+        else:
+            # If PEFT configuration is not provided, create a reference model based on the initial model.
+            self.ref_model = create_reference_model(model)
 
         # Processing class
         if processing_class is None:
@@ -211,7 +203,14 @@ class XGRPOTrainer(GRPOTrainer):
         self.num_generations = args.num_generations  # = G in the GRPO paper
         self.use_vllm = args.use_vllm
 
-        self.beta = args.beta
+        # Multi-step
+        # self.num_iterations = args.num_iterations  # = 𝜇 in the GRPO paper
+        # self.epsilon = args.epsilon
+        # Tracks the number of iterations (forward + backward passes), including those within a gradient accumulation cycle.
+        self._step = 0
+        # Buffer the batch to reuse generated outputs across multiple updates. For more details, see
+        # `_get_train_sampler` and `_prepare_inputs`.
+        # self._buffered_inputs = [None] * args.gradient_accumulation_steps
 
         # The trainer estimates the number of FLOPs (floating-point operations) using the number of elements in the
         # input tensor associated with the key "input_ids". However, in GRPO, the sampled data does not include the
@@ -313,6 +312,7 @@ class XGRPOTrainer(GRPOTrainer):
                 self.sampling_params = SamplingParams(
                     temperature=args.temperature,
                     max_tokens=self.max_completion_length,
+                    # n=args.num_generations,
                 )
 
             self._last_loaded_step = 0  # tag to avoid useless loading during grad accumulation
@@ -350,7 +350,6 @@ class XGRPOTrainer(GRPOTrainer):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
 
-    # https://github.com/huggingface/trl/pull/2873
     def _move_model_to_vllm(self):
         # https://github.com/huggingface/trl/issues/2840#issuecomment-2662747485
         for param in self.model.parameters():
@@ -363,7 +362,7 @@ class XGRPOTrainer(GRPOTrainer):
             if is_peft_model(unwrapped_model):
                 unwrapped_model.merge_adapter()
                 state_dict = unwrapped_model.state_dict()
-                unwrapped_model.unmerge_adapter()
+                # unwrapped_model.unmerge_adapter()
                 # Remove base_model and base_layer prefixes
                 state_dict = {
                     k.removeprefix("base_model.model.").replace(".base_layer", ""): v for k, v in state_dict.items()
@@ -378,9 +377,6 @@ class XGRPOTrainer(GRPOTrainer):
                 }
             else:
                 state_dict = unwrapped_model.state_dict()
-        if self.accelerator.is_main_process:
-            llm_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
-            llm_model.load_weights(state_dict.items())
             if self.accelerator.is_main_process:
                 llm_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
                 llm_model.load_weights(state_dict.items())
@@ -402,7 +398,6 @@ class XGRPOTrainer(GRPOTrainer):
         logits = logits[:, -logits_to_keep:]
         return selective_log_softmax(logits, input_ids)  #  compute logprobs for the input tokens
 
-
     def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
         device = self.accelerator.device
         prompts = [x["prompt"] for x in inputs]
@@ -410,8 +405,8 @@ class XGRPOTrainer(GRPOTrainer):
         prompt_inputs = self.processing_class(
             prompts_text, return_tensors="pt", padding=True, padding_side="left", add_special_tokens=False
         )
-        # print(prompt_inputs)
         # prompt_inputs = super()._prepare_inputs(prompt_inputs)
+        prompt_inputs = Trainer._prepare_inputs(self, inputs = prompt_inputs)
         prompt_ids, prompt_mask = prompt_inputs["input_ids"], prompt_inputs["attention_mask"]
 
         if self.max_prompt_length is not None:
@@ -487,7 +482,7 @@ class XGRPOTrainer(GRPOTrainer):
         completion_mask = (sequence_indices <= eos_idx.unsqueeze(1)).int()
 
         # Concatenate prompt_mask with completion_mask for logit computation
-        attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B*G, P+C)
+        attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B, P+C)
 
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
 
@@ -530,7 +525,7 @@ class XGRPOTrainer(GRPOTrainer):
                 reward_inputs = reward_processing_class(
                     texts, return_tensors="pt", padding=True, padding_side="right", add_special_tokens=False
                 )
-                reward_inputs = super()._prepare_inputs(reward_inputs)
+                reward_inputs = Trainer._prepare_inputs(self, inputs = reward_inputs)
                 with torch.inference_mode():
                     rewards_per_func[:, i] = reward_func(**reward_inputs).logits[:, 0]  # Shape (B*G,)
             else:
@@ -546,6 +541,7 @@ class XGRPOTrainer(GRPOTrainer):
 
         # Apply weights to each reward function's output and sum
         rewards = (rewards_per_func * self.reward_weights.to(device).unsqueeze(0)).sum(dim=1)
+        # print('x_grpo_rewars output:',rewards)
 
         # Compute grouped-wise rewards
         mean_grouped_rewards = rewards.view(-1, self.num_generations).mean(dim=1)
@@ -556,12 +552,16 @@ class XGRPOTrainer(GRPOTrainer):
         std_grouped_rewards = std_grouped_rewards.repeat_interleave(self.num_generations, dim=0)
         advantages = (rewards - mean_grouped_rewards) / (std_grouped_rewards + 1e-4)
 
+        print('advantage:', advantages)
+
         # Slice to keep only the local part of the data
         process_slice = slice(
             self.accelerator.process_index * len(prompts),
             (self.accelerator.process_index + 1) * len(prompts),
         )
         advantages = advantages[process_slice]
+
+        print('advantage:', advantages)
 
         # Log the metrics
         reward_per_func = rewards_per_func.mean(0)

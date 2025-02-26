@@ -123,18 +123,10 @@ def vllm_generate(model_name, output_name, dataset_name, num_gpus, max_output_to
     print('eval acc: ', total_acc / len(acc_scores))
     print('eval format: ',total_format / len(format_scores))
 
-
-
-
     current_result_file = output_name + '.json'
     with open(current_result_file, 'w', encoding='utf-8') as file:
         json.dump(result_all, file, ensure_ascii=False, indent=4)
-
-
-
-    
-
-
+        
     return 
 
 

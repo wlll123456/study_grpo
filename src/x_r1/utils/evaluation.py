@@ -73,8 +73,6 @@ def run_lighteval_job(
     else:
         tensor_parallel = False
 
-    print('hahhahahah')
-
     cmd = VLLM_SLURM_PREFIX.copy()
     cmd_args = [
         f"--gres=gpu:{num_gpus}",
