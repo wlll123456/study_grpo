@@ -69,6 +69,94 @@ if is_wandb_available():
 RewardFunc = Union[str, PreTrainedModel, Callable[[list, list], list[float]]]
 
 
+class RepeatRandomSampler(Sampler):
+    """
+    Sampler that repeats the indices of a dataset in a structured manner.
+
+    Args:
+        data_source (`Sized`):
+            Dataset to sample from.
+        mini_repeat_count (`int`):
+            Number of times to repeat each index per batch.
+        batch_size (`int`, *optional*, defaults to `1`):
+            Number of unique indices per batch.
+        repeat_count (`int`, *optional*, defaults to `1`):
+            Number of times to repeat the full sampling process.
+        seed (`int` or `None`, *optional*, defaults to `None`):
+            Random seed for reproducibility (only affects this sampler).
+
+    Example:
+    ```python
+    >>> sampler = RepeatRandomSampler(["a", "b", "c", "d", "e", "f", "g"], mini_repeat_count=2, batch_size=3, repeat_count=4)
+    >>> list(sampler)
+    [4, 4, 3, 3, 0, 0,
+     4, 4, 3, 3, 0, 0,
+     4, 4, 3, 3, 0, 0,
+     4, 4, 3, 3, 0, 0,
+
+     1, 1, 2, 2, 6, 6,
+     1, 1, 2, 2, 6, 6,
+     1, 1, 2, 2, 6, 6,
+     1, 1, 2, 2, 6, 6]
+    ```
+
+    ```txt
+    mini_repeat_count = 3
+          -   -   -
+         [0,  0,  0,  1,  1,  1,  2,  2,  2,  3,  3,  3,      |
+          4,  4,  4,  5,  5,  5,  6,  6,  6,  7,  7,  7,      |
+          8,  8,  8,  9,  9,  9, 10, 10, 10, 11, 11, 11,      |
+                                                                repeat_count = 2
+          0,  0,  0,  1,  1,  1,  2,  2,  2,  3,  3,  3,      |
+          4,  4,  4,  5,  5,  5,  6,  6,  6,  7,  7,  7,      |
+          8,  8,  8,  9,  9,  9, 10, 10, 10, 11, 11, 11, ...] |
+          ---------   ---------   ---------   ---------
+           ---------   ---------   ---------   ---------
+            ---------   ---------   ---------   ---------
+                         batch_size = 12
+    ```
+    """
+
+    def __init__(
+        self,
+        data_source: Sized,
+        mini_repeat_count: int,
+        batch_size: int = 1,
+        repeat_count: int = 1,
+        seed: Optional[int] = None,
+    ):
+        self.data_source = data_source
+        self.mini_repeat_count = mini_repeat_count
+        self.batch_size = batch_size
+        self.repeat_count = repeat_count
+        self.num_samples = len(data_source)
+        self.seed = seed
+        self.generator = torch.Generator()  # Create a local random generator
+        if seed is not None:
+            self.generator.manual_seed(seed)
+
+    def __iter__(self):
+        # E.g., [2, 4, 3, 1, 0, 6, 5] (num_samples = 7)
+        indexes = torch.randperm(self.num_samples, generator=self.generator).tolist()
+
+        #    [2, 4, 3, 1, 0, 6, 5]
+        # -> [[2, 4, 3], [1, 0, 6], [5]]  (batch_size = 3)
+        indexes = [indexes[i : i + self.batch_size] for i in range(0, len(indexes), self.batch_size)]
+
+        #    [[2, 4, 3], [1, 0, 6], [5]]
+        # -> [[2, 4, 3], [1, 0, 6]]
+        indexes = [chunk for chunk in indexes if len(chunk) == self.batch_size]
+
+        for chunk in indexes:
+            for _ in range(self.repeat_count):
+                for index in chunk:
+                    for _ in range(self.mini_repeat_count):
+                        yield index
+
+    def __len__(self) -> int:
+        return self.num_samples * self.mini_repeat_count * self.repeat_count
+
+
 class XGRPOTrainer(GRPOTrainer):
     # base trl GRPO_trainer
 
@@ -79,7 +167,7 @@ class XGRPOTrainer(GRPOTrainer):
         self,
         model: Union[str, PreTrainedModel],
         reward_funcs: Union[RewardFunc, list[RewardFunc]],
-        args: GRPOConfig = None,
+        args: Optional[GRPOConfig] = None,
         train_dataset: Optional[Union[Dataset, IterableDataset]] = None,
         eval_dataset: Optional[Union[Dataset, IterableDataset, dict[str, Union[Dataset, IterableDataset]]]] = None,
         processing_class: Optional[PreTrainedTokenizerBase] = None,
@@ -204,13 +292,13 @@ class XGRPOTrainer(GRPOTrainer):
         self.use_vllm = args.use_vllm
 
         # Multi-step
-        # self.num_iterations = args.num_iterations  # = 𝜇 in the GRPO paper
-        # self.epsilon = args.epsilon
+        self.num_iterations = args.num_iterations  # = 𝜇 in the GRPO paper
+        self.epsilon = args.epsilon
         # Tracks the number of iterations (forward + backward passes), including those within a gradient accumulation cycle.
         self._step = 0
         # Buffer the batch to reuse generated outputs across multiple updates. For more details, see
         # `_get_train_sampler` and `_prepare_inputs`.
-        # self._buffered_inputs = [None] * args.gradient_accumulation_steps
+        self._buffered_inputs = [None] * args.gradient_accumulation_steps
 
         # The trainer estimates the number of FLOPs (floating-point operations) using the number of elements in the
         # input tensor associated with the key "input_ids". However, in GRPO, the sampled data does not include the
@@ -221,7 +309,7 @@ class XGRPOTrainer(GRPOTrainer):
         model.warnings_issued["estimate_tokens"] = True
 
         # Initialize the metrics
-        self._metrics = defaultdict(list)
+        self._metrics = {"train": defaultdict(list), "eval": defaultdict(list)}
         self.log_completions = args.log_completions
 
         Trainer.__init__(self,
@@ -312,7 +400,7 @@ class XGRPOTrainer(GRPOTrainer):
                 self.sampling_params = SamplingParams(
                     temperature=args.temperature,
                     max_tokens=self.max_completion_length,
-                    # n=args.num_generations,
+                    n=args.num_generations,
                 )
 
             self._last_loaded_step = 0  # tag to avoid useless loading during grad accumulation
@@ -350,6 +438,19 @@ class XGRPOTrainer(GRPOTrainer):
             if isinstance(reward_func, PreTrainedModel):
                 self.reward_funcs[i] = self.accelerator.prepare_model(reward_func, evaluation_mode=True)
 
+    # Get the per-token log probabilities for the completions for the model and the reference model
+    # @profiling_decorator
+    def _get_per_token_logps(self, model, input_ids, attention_mask, logits_to_keep):
+        # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
+        logits = model(input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1).logits
+        logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
+
+        input_ids = input_ids[:, -logits_to_keep:]
+        # For transformers<=4.48, logits_to_keep argument isn't supported, so here we drop logits ourselves.
+        # See https://github.com/huggingface/trl/issues/2770
+        logits = logits[:, -logits_to_keep:]
+        return selective_log_softmax(logits, input_ids)  #  compute logprobs for the input tokens
+
     def _move_model_to_vllm(self):
         # https://github.com/huggingface/trl/issues/2840#issuecomment-2662747485
         for param in self.model.parameters():
@@ -362,7 +463,6 @@ class XGRPOTrainer(GRPOTrainer):
             if is_peft_model(unwrapped_model):
                 unwrapped_model.merge_adapter()
                 state_dict = unwrapped_model.state_dict()
-                # unwrapped_model.unmerge_adapter()
                 # Remove base_model and base_layer prefixes
                 state_dict = {
                     k.removeprefix("base_model.model.").replace(".base_layer", ""): v for k, v in state_dict.items()
@@ -386,19 +486,23 @@ class XGRPOTrainer(GRPOTrainer):
                 unwrapped_model.unmerge_adapter()
 
 
-    # Get the per-token log probabilities for the completions for the model and the reference model
-    def _get_per_token_logps(self, model, input_ids, attention_mask, logits_to_keep):
-        # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
-        logits = model(input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1).logits
-        logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
-
-        input_ids = input_ids[:, -logits_to_keep:]
-        # For transformers<=4.48, logits_to_keep argument isn't supported, so here we drop logits ourselves.
-        # See https://github.com/huggingface/trl/issues/2770
-        logits = logits[:, -logits_to_keep:]
-        return selective_log_softmax(logits, input_ids)  #  compute logprobs for the input tokens
-
     def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
+        mode = "eval" if self.control.should_evaluate else "train"
+        if mode == "train":
+            if self.state.global_step % self.num_iterations == 0:
+                inputs = self._generate_and_score_completions(inputs)
+                self._buffered_inputs[self._step % self.args.gradient_accumulation_steps] = inputs
+            else:
+                inputs = self._buffered_inputs[self._step % self.args.gradient_accumulation_steps]
+            self._step += 1
+        else:
+            # In evaluation, we don't reuse completions across multiple updates, so we don't need to buffer inputs.
+            inputs = self._generate_and_score_completions(inputs)
+        return inputs
+
+    def _generate_and_score_completions(
+        self, inputs: dict[str, Union[torch.Tensor, Any]]
+    ) -> dict[str, Union[torch.Tensor, Any]]:
         device = self.accelerator.device
         prompts = [x["prompt"] for x in inputs]
         prompts_text = [maybe_apply_chat_template(example, self.processing_class)["prompt"] for example in inputs]
@@ -417,15 +521,21 @@ class XGRPOTrainer(GRPOTrainer):
         if self.args.use_vllm:
             # First, have main process load weights if needed
             if self.state.global_step != self._last_loaded_step:
-                self._move_model_to_vllm() # 对于PEFT先merge 参数，更新到vllm，
+                self._move_model_to_vllm()
                 self._last_loaded_step = self.state.global_step
 
             # Generate completions using vLLM: gather all prompts and use them in a single call in the main process
             all_prompts_text = gather_object(prompts_text)
             if self.accelerator.is_main_process:
-                outputs = self.llm.generate(all_prompts_text, sampling_params=self.sampling_params, use_tqdm=False)
-                completion_ids = [out.token_ids for completions in outputs for out in completions.outputs]
-                for output in outputs:
+                ordered_set_of_prompts = list(dict.fromkeys(all_prompts_text))
+                all_outputs = self.llm.generate(
+                    ordered_set_of_prompts, sampling_params=self.sampling_params, use_tqdm=False
+                )
+                completion_ids = []
+                for outputs in all_outputs:
+                    for output in outputs.outputs:
+                        completion_ids.append(output.token_ids)
+                for output in all_outputs:
                     print('-'*100)
                     print('\n\n\n')
                     prompt = output.prompt
@@ -486,11 +596,20 @@ class XGRPOTrainer(GRPOTrainer):
 
         logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
 
-        with torch.inference_mode():
-            # 如果是peft, base参数共享
-            # base 作为 ref model
-            # base + Lora 作为 policy model
-            if self.ref_model is not None:
+        # with torch.inference_mode():
+        with torch.no_grad():
+            # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's
+            # computation here, and use per_token_logps.detach() instead.
+            if self.num_iterations > 1:
+                old_per_token_logps = self._get_per_token_logps(
+                    self.model, prompt_completion_ids, attention_mask, logits_to_keep
+                )
+            else:
+                old_per_token_logps = None
+
+            if self.beta == 0.0:
+                ref_per_token_logps = None
+            elif self.ref_model is not None:
                 print('is not peft')
                 ref_per_token_logps = self._get_per_token_logps(
                     self.ref_model, prompt_completion_ids, attention_mask, logits_to_keep
@@ -541,7 +660,7 @@ class XGRPOTrainer(GRPOTrainer):
 
         # Apply weights to each reward function's output and sum
         rewards = (rewards_per_func * self.reward_weights.to(device).unsqueeze(0)).sum(dim=1)
-        # print('x_grpo_rewars output:',rewards)
+        print('x_grpo_rewars output:',rewards)
 
         # Compute grouped-wise rewards
         mean_grouped_rewards = rewards.view(-1, self.num_generations).mean(dim=1)
@@ -564,46 +683,59 @@ class XGRPOTrainer(GRPOTrainer):
         print('advantage:', advantages)
 
         # Log the metrics
+        mode = "eval" if self.control.should_evaluate else "train"
+
+        completion_length = self.accelerator.gather_for_metrics(completion_mask.sum(1)).float().mean().item()
+        self._metrics[mode]["completion_length"].append(completion_length)
+
         reward_per_func = rewards_per_func.mean(0)
         for i, reward_func in enumerate(self.reward_funcs):
             if isinstance(reward_func, nn.Module):  # Module instead of PretrainedModel for compat with compiled models
                 reward_func_name = reward_func.config._name_or_path.split("/")[-1]
             else:
                 reward_func_name = reward_func.__name__
-            self._metrics[f"rewards/{reward_func_name}"].append(reward_per_func[i].item())
+            self._metrics[mode][f"rewards/{reward_func_name}"].append(reward_per_func[i].item())
 
-        self._metrics["reward"].append(rewards.mean().item())
-        self._metrics["reward_std"].append(std_grouped_rewards.mean().item())
+        self._metrics[mode]["reward"].append(rewards.mean().item())
+        self._metrics[mode]["reward_std"].append(std_grouped_rewards.mean().item())
 
-        if (
-            self.log_completions
-            and self.state.global_step % self.args.logging_steps == 0
-            and "wandb" in self.args.report_to
-        ):
-            import pandas as pd
+        if self.log_completions and self.state.global_step % self.args.logging_steps == 0:
+            prompts_to_log = gather_object(prompts_text)
+            completions_to_log = gather_object(completions_text)
+            rewards_to_log = rewards.tolist()
 
-            # For logging
-            table = {
-                "step": [str(self.state.global_step)] * len(rewards),
-                "prompt": gather_object(prompts_text),
-                "completion": gather_object(completions_text),
-                "reward": rewards.tolist(),
-            }
-            df = pd.DataFrame(table)
+            if self.accelerator.is_main_process:
+                if is_rich_available():
+                    print_prompt_completions_sample(
+                        prompts_to_log,
+                        completions_to_log,
+                        rewards_to_log,
+                        self.state.global_step,
+                    )
+                if self.args.report_to and "wandb" in self.args.report_to and wandb.run is not None:
+                    import pandas as pd
 
-            if wandb.run is not None and self.accelerator.is_main_process:
-                wandb.log({"completions": wandb.Table(dataframe=df)})
+                    # For logging
+                    table = {
+                        "step": [str(self.state.global_step)] * len(rewards),
+                        "prompt": prompts_to_log,
+                        "completion": completions_to_log,
+                        "reward": rewards.tolist(),
+                    }
+                    df = pd.DataFrame(table)
+                    wandb.log({"completions": wandb.Table(dataframe=df)})
 
         return {
             "prompt_ids": prompt_ids,
             "prompt_mask": prompt_mask,
             "completion_ids": completion_ids,
             "completion_mask": completion_mask,
+            "old_per_token_logps": old_per_token_logps,
             "ref_per_token_logps": ref_per_token_logps,
             "advantages": advantages,
         }
 
-
+    # @profiling_decorator
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         if return_outputs:
             raise ValueError("The GRPOTrainer does not support returning outputs")
@@ -618,21 +750,34 @@ class XGRPOTrainer(GRPOTrainer):
         per_token_logps = self._get_per_token_logps(model, input_ids, attention_mask, logits_to_keep)
 
         # Compute the KL divergence between the model and the reference model
-        ref_per_token_logps = inputs["ref_per_token_logps"]
-        per_token_kl = torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
+        if self.beta != 0.0:
+            ref_per_token_logps = inputs["ref_per_token_logps"]
+            per_token_kl = (
+                torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
+            )
 
-        # x - x.detach() allows for preserving gradients from x
+        # Compute the loss
         advantages = inputs["advantages"]
-        per_token_loss = torch.exp(per_token_logps - per_token_logps.detach()) * advantages.unsqueeze(1)
-        per_token_loss = -(per_token_loss - self.beta * per_token_kl)
+        # When using num_iterations == 1, old_per_token_logps == per_token_logps, so we can skip it's computation (see
+        # _generate_and_score_completions) and use per_token_logps.detach() instead.
+        old_per_token_logps = inputs["old_per_token_logps"] if self.num_iterations > 1 else per_token_logps.detach()
+        coef_1 = torch.exp(per_token_logps - old_per_token_logps)
+        coef_2 = torch.clamp(coef_1, 1 - self.epsilon, 1 + self.epsilon)
+        per_token_loss1 = coef_1 * advantages.unsqueeze(1)
+        per_token_loss2 = coef_2 * advantages.unsqueeze(1)
+        per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
+        if self.beta != 0.0:
+            per_token_loss = per_token_loss + self.beta * per_token_kl
         loss = (per_token_loss * completion_mask).sum() / completion_mask.sum()
-        # loss = ((per_token_loss * completion_mask).sum(dim=1) / completion_mask.sum(dim=1)).mean()
 
         # Log the metrics
-        completion_length = self.accelerator.gather_for_metrics(completion_mask.sum(1)).float().mean().item()
-        self._metrics["completion_length"].append(completion_length)
+        mode = "eval" if self.control.should_evaluate else "train"
 
-        mean_kl = ((per_token_kl * completion_mask).sum(dim=1) / completion_mask.sum(dim=1)).mean()
-        self._metrics["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
+        if self.beta != 0.0:
+            mean_kl = ((per_token_kl * completion_mask).sum(dim=1) / completion_mask.sum(dim=1)).mean()
+            self._metrics[mode]["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
 
+        is_clipped = (per_token_loss1 < per_token_loss2).float()
+        clip_ratio = (is_clipped * completion_mask).sum() / completion_mask.sum()
+        self._metrics[mode]["clip_ratio"].append(self.accelerator.gather_for_metrics(clip_ratio).mean().item())
         return loss

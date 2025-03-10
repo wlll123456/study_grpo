@@ -12,7 +12,6 @@ attn_implementation: flash_attention_2
 dataset_name: xiaodongguaAIGC/X-R1-750 #  750 / 1500 / 7500
 dataset_configs:
 - train
-num_processes: 3
 
 # GRPO trainer config
 bf16: true
@@ -35,7 +34,7 @@ max_prompt_length: 256
 num_generations: 12
 max_completion_length: 1024
 max_steps: -1
-num_train_epochs: 2
+num_train_epochs: 3
 output_dir: output/X-R1-0.5B-bs4-numgen12-gas8-gpu3
 overwrite_output_dir: true
 per_device_eval_batch_size: 1
