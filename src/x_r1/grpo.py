@@ -24,7 +24,8 @@ from datasets import load_dataset
 from transformers import set_seed
 from transformers.trainer_utils import get_last_checkpoint
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
+from typing import Dict, Any, List  # 添加必要的类型导入
+import yaml  # 添加yaml导入
 
 from configs import GRPOConfig
 from rewards import (
@@ -55,10 +56,24 @@ def init_wandb_training(training_args):
     if training_args.wandb_project is not None:
         os.environ["WANDB_PROJECT"] = training_args.wandb_project
 
+def load_reward_config(config_path: str) -> Dict[str, Any]:
+    """加载奖励配置文件"""
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+
+
 
 
 @dataclass
 class GRPOScriptArguments(ScriptArguments):
+
+    reward_config_path: str = field(
+        default="recipes/reward_config.yaml",
+        metadata={
+            "help": "Path to the reward configuration file."
+        },
+    )
+
     reward_funcs: list[str] = field(
         default_factory=lambda: ["accuracy", "format"],
         metadata={
@@ -95,7 +110,29 @@ class GRPOScriptArguments(ScriptArguments):
         metadata={"help": "Maximum (negative) penalty for for repetition penalty reward"},
     )
 
-
+def get_reward_functions(config: Dict[str, Any]) -> List[str]:
+    """根据配置文件获取启用的奖励函数名称列表"""
+    reward_funcs = []
+    
+    if config['rewards']['dpo_reward']['enabled']:
+        reward_funcs.append('accuracy')
+        
+    if config['rewards']['custom_rewards']['format_reward']['enabled']:
+        reward_funcs.append('format')
+        
+    if config['rewards']['custom_rewards']['reasoning_steps_reward']['enabled']:
+        reward_funcs.append('reasoning_steps')
+        
+    if config['rewards']['custom_rewards']['cosine_reward']['enabled']:
+        reward_funcs.append('cosine')
+        
+    if config['rewards']['custom_rewards']['repetition_penalty_reward']['enabled']:
+        reward_funcs.append('repetition_penalty')
+        
+    if config['rewards']['custom_rewards']['length_reward']['enabled']:
+        reward_funcs.append('length')
+    
+    return reward_funcs
 
 SYSTEM_PROMPT = (
     "A conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant "
@@ -153,6 +190,9 @@ def main(script_args, training_args, model_args):
             "Ground-True Answer": "solution"
         })
 
+    # 加载奖励配置
+    reward_config = load_reward_config(script_args.reward_config_path)
+    reward_funcs_tmp = get_reward_functions(reward_config)
     # Get reward functions
     REWARD_FUNCS_REGISTRY = {
         "accuracy": accuracy_reward,
@@ -171,7 +211,7 @@ def main(script_args, training_args, model_args):
         ),
         "length": len_reward,
     }
-    reward_funcs = [REWARD_FUNCS_REGISTRY[func] for func in script_args.reward_funcs]
+    reward_funcs = [REWARD_FUNCS_REGISTRY[func] for func in reward_funcs_tmp]
 
     # Format into conversation
     def make_conversation(example):

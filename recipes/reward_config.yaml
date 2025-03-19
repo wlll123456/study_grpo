@@ -1,0 +1,64 @@
+# Reward Model Configuration
+
+# 基础奖励模型设置
+# reward_model:
+#   # 奖励模型路径
+#   model_name_or_path: /path/to/your/reward_model
+#   torch_dtype: bfloat16
+#   max_length: 2048
+
+# 奖励函数配置
+rewards:
+  # DPO style reward
+  dpo_reward:
+    enabled: false
+    weight: 1.0
+    
+  # HF RLHF reward
+  hf_rlhf_reward:
+    enabled: false
+    weight: 0.8
+    
+  # 自定义规则奖励
+  custom_rewards:
+    # 长度奖励 - 惩罚过长或过短的回答
+    length_reward:
+      enabled: true
+      weight: 0.3
+      min_length: 50
+      max_length: 512
+      
+    # 格式奖励 - 确保输出格式正确
+    format_reward:
+      enabled: true
+      weight: 0.4
+      
+    # 推理步骤奖励 - 鼓励模型进行更多推理
+    reasoning_steps_reward:
+      enabled: true
+      weight: 0.2
+      
+    # 余弦相似度奖励
+    cosine_reward:
+      enabled: true
+      weight: 0.4
+      
+    # 重复惩罚奖励
+    repetition_penalty_reward:
+      enabled: true
+      weight: 0.3
+
+# 奖励组合设置
+reward_combination:
+  # 可选: "sum", "weighted_sum", "multiply"
+  method: "weighted_sum"
+  # 是否归一化奖励值到[-1,1]区间
+  normalize: true
+
+# # 训练参数
+# training:
+#   # 奖励计算的batch size
+#   batch_size: 8
+#   # 是否使用缓存来存储计算过的奖励值
+#   use_cache: true
+#   cache_size: 10000 

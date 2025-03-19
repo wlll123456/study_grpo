@@ -454,7 +454,8 @@ class XGRPOTrainer(GRPOTrainer):
     def _move_model_to_vllm(self):
         # https://github.com/huggingface/trl/issues/2840#issuecomment-2662747485
         for param in self.model.parameters():
-            param.ds_active_sub_modules.clear()
+            if hasattr(param, "ds_active_sub_modules"):
+                param.ds_active_sub_modules.clear()
         with unwrap_model_for_generation(
             self.model, self.accelerator, gather_deepspeed3_params=self.args.ds3_gather_for_generation
         ) as unwrapped_model:
@@ -651,7 +652,14 @@ class XGRPOTrainer(GRPOTrainer):
                 # Repeat all input columns (but "prompt" and "completion") to match the number of generations
                 keys = [key for key in inputs[0] if key not in ["prompt", "completion"]]
                 reward_kwargs = {key: [example[key] for example in inputs] for key in keys}
-                output_reward_func = reward_func(prompts=prompts, completions=completions, **reward_kwargs)
+                # Add solutions parameter if it exists in the inputs
+                if "solution" in inputs[0]:
+                    # print("====================================================================================================")
+                    reward_kwargs["solution"] = [example["solution"] for example in inputs]
+                    # print(reward_kwargs["solution"])
+                else :
+                    reward_kwargs["solution"] = ['']
+                output_reward_func = reward_func(prompts=prompts, completions=completions, solutions= reward_kwargs["solution"], **reward_kwargs)
                 rewards_per_func[:, i] = torch.tensor(output_reward_func, dtype=torch.float32, device=device)
 
         # Gather the reward per function: this part is crucial, because the rewards are normalized per group and the

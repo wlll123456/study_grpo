@@ -6,7 +6,7 @@ import os
 from openai import OpenAI
 from latex2sympy2_extended import NormalizationConfig
 from math_verify import LatexExtractionConfig, parse, verify
-
+import math
 # Initialize OpenAI client
 client = OpenAI(
     api_key="",
@@ -220,24 +220,28 @@ def len_reward(completions: list[Dict[str, str]], solutions: list[str], **kwargs
 
     # Calculate lengths
     lengths = [len(content) for content in contents]
+    sol_lengths = [len(sol) for sol in solutions]
     min_len = min(lengths)
     max_len = max(lengths)
 
-    # If all responses have the same length, return zero rewards
-    if max_len == min_len:
-        return [0.0] * len(completions)
+    # If all responses have the same length or any solution is too short, return full rewards
+    if max_len == min_len or any(sol_len < 10 for sol_len in sol_lengths):
+        return [0.5 if is_correct else 0.0 for is_correct in correctness]
 
     rewards = []
-    for length, is_correct in zip(lengths, correctness):
-        lambda_val = 0.5 - (length - min_len) / (max_len - min_len)
-
-        if is_correct:
-            reward = lambda_val
+    for length, is_correct, sol_len in zip(lengths, correctness, sol_lengths):
+        # Skip length penalty if solution is short
+        if sol_len < 10:
+            reward = 0.5 if is_correct else 0.0
         else:
-            reward = min(0, lambda_val)
-
+            lambda_val = 0.5 - (length - min_len) / (max_len - min_len)
+            if is_correct:
+                reward = lambda_val
+            else:
+                reward = min(0, lambda_val)
+        
         rewards.append(float(reward))
-
+    print('length rewards:', rewards)
     return rewards
 
 
@@ -313,7 +317,7 @@ def get_cosine_scaled_reward(
             rewards.append(float(reward))
 
         return rewards
-
+    print('cosine rewards:', cosine_scaled_reward)
     return cosine_scaled_reward
 
 
@@ -362,5 +366,5 @@ def get_repetition_penalty_reward(ngram_size: int, max_penalty: float):
             reward = scaling * max_penalty
             rewards.append(reward)
         return rewards
-
+    print('repetition rewards:', repetition_penalty_reward)
     return repetition_penalty_reward
